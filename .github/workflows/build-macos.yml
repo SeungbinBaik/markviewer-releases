@@ -45,19 +45,15 @@ jobs:
           tar -xzf source.tar.gz --strip-components=1
           rm source.tar.gz
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          # Use local npm cache for faster installs
+          npm install --prefer-offline --no-audit
 
       - name: Build frontend
         run: npm run build:vite
