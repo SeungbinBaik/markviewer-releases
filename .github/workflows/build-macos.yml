@@ -68,13 +68,31 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
+          # Decode certificate
           echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+
+          # Create and configure keychain
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security default-keychain -s build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+
+          # Import certificate with -A flag for all apps
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -A
+
+          # Set partition list
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+          # Add keychain to search list
+          security list-keychains -d user -s build.keychain $(security list-keychains -d user | sed s/\"//g)
+
+          # Set as default
+          security default-keychain -s build.keychain
+
+          # Clean up
           rm certificate.p12
+
+          # Verify
+          security find-identity -v -p codesigning
 
       - name: Build ARM64
         run: npm run tauri build -- --target aarch64-apple-darwin --bundles app
@@ -95,18 +113,18 @@ jobs:
         env:
             KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-            # Unlock build keychain
+            # Unlock keychain
             security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
 
-            # Use SHA-1 hash directly (codesign accepts this)
-            SIGNING_IDENTITY=$(security find-identity -v build.keychain | grep "Developer ID Application" | head -1 | awk '{print $2}')
+            # Find identity SHA-1
+            SIGNING_IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | awk '{print $2}')
 
-            echo "Using identity SHA-1: $SIGNING_IDENTITY"
+            echo "Using identity: $SIGNING_IDENTITY"
 
+            # Sign (keychain will be found automatically from search list)
             codesign --force --deep --sign "$SIGNING_IDENTITY" \
               --options runtime \
               --entitlements src-tauri/entitlements.plist \
-              --keychain build.keychain \
               /tmp/universal-build/MarkViewer.app
 
       - name: Create DMG
@@ -123,17 +141,16 @@ jobs:
         env:
             KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-            # Unlock build keychain
+            # Unlock keychain
             security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
 
-            # Use SHA-1 hash directly (codesign accepts this)
-            SIGNING_IDENTITY=$(security find-identity -v build.keychain | grep "Developer ID Application" | head -1 | awk '{print $2}')
+            # Find identity SHA-1
+            SIGNING_IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | awk '{print $2}')
 
-            echo "Using identity SHA-1: $SIGNING_IDENTITY"
+            echo "Using identity: $SIGNING_IDENTITY"
 
-            codesign --force --sign "$SIGNING_IDENTITY" \
-              --keychain build.keychain \
-              MarkViewer.dmg
+            # Sign (keychain will be found automatically)
+            codesign --force --sign "$SIGNING_IDENTITY" MarkViewer.dmg
 
       - name: Notarize DMG
         env:
