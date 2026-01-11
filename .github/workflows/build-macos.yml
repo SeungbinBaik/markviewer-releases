@@ -243,8 +243,8 @@ jobs:
         run: |
           VERSION="${{ needs.build-macos.outputs.version }}"
 
-          # Update LATEST_VERSION variable
-          sed -i "s/const LATEST_VERSION = .*/const LATEST_VERSION = 'v${VERSION}';/" index.html
+          # Update LATEST_VERSION variable (without 'v' prefix - website adds it in URL)
+          sed -i "s/const LATEST_VERSION = .*/const LATEST_VERSION = '${VERSION}';/" index.html
 
           # Update softwareVersion in JSON-LD schema
           sed -i "s/\"softwareVersion\": \".*\"/\"softwareVersion\": \"${VERSION}\"/" index.html
