@@ -1,0 +1,221 @@
+name: Build macOS
+
+on:
+  repository_dispatch:
+    types: [build-macos]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 1.0.26)'
+        required: true
+        type: string
+
+jobs:
+  build-macos:
+    runs-on: self-hosted
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
+
+    steps:
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            echo "VERSION=${{ github.event.client_payload.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Clean workspace
+        run: |
+          rm -rf ${{ github.workspace }}/*
+          rm -rf ${{ github.workspace }}/.??*
+
+      - name: Download source from private repo
+        env:
+          PRIVATE_REPO_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+        run: |
+          curl -L \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${PRIVATE_REPO_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/SeungbinBaik/immarkviewer/tarball/v${{ steps.version.outputs.VERSION }} \
+            -o source.tar.gz
+
+          tar -xzf source.tar.gz --strip-components=1
+          rm source.tar.gz
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build frontend
+        run: npm run build:vite
+
+      - name: Setup code signing
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          rm certificate.p12
+
+      - name: Build ARM64
+        run: npm run tauri build -- --target aarch64-apple-darwin --bundles app
+
+      - name: Build x86_64
+        run: npm run tauri build -- --target x86_64-apple-darwin --bundles app
+
+      - name: Create universal binary
+        run: |
+          mkdir -p /tmp/universal-build
+          cp -R src-tauri/target/aarch64-apple-darwin/release/bundle/macos/MarkViewer.app /tmp/universal-build/
+          lipo -create \
+            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/MarkViewer.app/Contents/MacOS/MarkViewer \
+            src-tauri/target/x86_64-apple-darwin/release/bundle/macos/MarkViewer.app/Contents/MacOS/MarkViewer \
+            -output /tmp/universal-build/MarkViewer.app/Contents/MacOS/MarkViewer
+
+      - name: Sign universal app
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          codesign --force --deep --sign "$APPLE_SIGNING_IDENTITY" \
+            --options runtime \
+            --entitlements src-tauri/entitlements.plist \
+            /tmp/universal-build/MarkViewer.app
+
+      - name: Create DMG
+        run: |
+          # Check if script exists, otherwise use simple approach
+          if [ -f "scripts/create-dmg.sh" ]; then
+            bash scripts/create-dmg.sh /tmp/universal-build/MarkViewer.app MarkViewer.dmg
+          else
+            # Fallback: use hdiutil directly
+            hdiutil create -volname "MarkViewer" -srcfolder /tmp/universal-build/MarkViewer.app -ov -format UDZO MarkViewer.dmg
+          fi
+
+      - name: Sign DMG
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" MarkViewer.dmg
+
+      - name: Notarize DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+        run: |
+          xcrun notarytool submit MarkViewer.dmg \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_PASSWORD" \
+            --wait
+
+          xcrun stapler staple MarkViewer.dmg
+
+      - name: Create update bundle
+        run: |
+          cd /tmp/universal-build
+          tar -czf MarkViewer_universal.app.tar.gz MarkViewer.app
+          mv MarkViewer_universal.app.tar.gz ${{ github.workspace }}/
+
+      - name: Sign update bundle
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          npm run tauri signer sign MarkViewer_universal.app.tar.gz \
+            --private-key "$TAURI_SIGNING_PRIVATE_KEY" \
+            --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
+
+      - name: Upload to releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          gh release create v${{ steps.version.outputs.VERSION }} \
+            --repo SeungbinBaik/markviewer-releases \
+            --title "MarkViewer v${{ steps.version.outputs.VERSION }}" \
+            --notes "Release v${{ steps.version.outputs.VERSION }}" \
+            MarkViewer.dmg \
+            MarkViewer_universal.app.tar.gz \
+            MarkViewer_universal.app.tar.gz.sig
+
+      - name: Update manifest
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          # Create latest.json with update information
+          cat > latest.json <<EOF
+          {
+            "version": "v${{ steps.version.outputs.VERSION }}",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "darwin-aarch64": {
+                "signature": "$(cat MarkViewer_universal.app.tar.gz.sig)",
+                "url": "https://github.com/SeungbinBaik/markviewer-releases/releases/download/v${{ steps.version.outputs.VERSION }}/MarkViewer_universal.app.tar.gz"
+              },
+              "darwin-x86_64": {
+                "signature": "$(cat MarkViewer_universal.app.tar.gz.sig)",
+                "url": "https://github.com/SeungbinBaik/markviewer-releases/releases/download/v${{ steps.version.outputs.VERSION }}/MarkViewer_universal.app.tar.gz"
+              }
+            }
+          }
+          EOF
+
+          gh release upload v${{ steps.version.outputs.VERSION }} \
+            --repo SeungbinBaik/markviewer-releases \
+            --clobber \
+            latest.json
+
+      - name: Clean up
+        if: always()
+        run: |
+          security delete-keychain build.keychain || true
+          rm -rf ${{ github.workspace }}/*
+          rm -rf ${{ github.workspace }}/.??*
+
+  update-website:
+    needs: build-macos
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout website repo
+        uses: actions/checkout@v4
+        with:
+          repository: SeungbinBaik/markviewer
+          token: ${{ secrets.RELEASE_PAT }}
+
+      - name: Update download links in index.html
+        run: |
+          VERSION="${{ needs.build-macos.outputs.version }}"
+
+          # Update LATEST_VERSION variable
+          sed -i "s/const LATEST_VERSION = .*/const LATEST_VERSION = 'v${VERSION}';/" index.html
+
+          # Update softwareVersion in JSON-LD schema
+          sed -i "s/\"softwareVersion\": \".*\"/\"softwareVersion\": \"${VERSION}\"/" index.html
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Update download links to v${{ needs.build-macos.outputs.version }}"
+          git push
