@@ -91,10 +91,10 @@ jobs:
               src-tauri/target/x86_64-apple-darwin/release/bundle/macos/MarkViewer.app/Contents/MacOS/app \
               -output /tmp/universal-build/MarkViewer.app/Contents/MacOS/app
 
-        - name: Sign universal app
-          env:
+      - name: Sign universal app
+        env:
             KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-          run: |
+        run: |
             # Unlock build keychain
             security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
 
@@ -117,10 +117,10 @@ jobs:
             hdiutil create -volname "MarkViewer" -srcfolder /tmp/universal-build/MarkViewer.app -ov -format UDZO MarkViewer.dmg
           fi
 
-        - name: Sign DMG
-          env:
+      - name: Sign DMG
+        env:
             KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-          run: |
+        run: |
             # Unlock build keychain
             security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
 
