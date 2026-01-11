@@ -170,7 +170,8 @@ jobs:
       - name: Create update bundle
         run: |
           cd /tmp/universal-build
-          tar -czf MarkViewer_universal.app.tar.gz MarkViewer.app
+          # Exclude macOS metadata files (._*) to prevent unpack errors
+          COPYFILE_DISABLE=1 tar -czf MarkViewer_universal.app.tar.gz --exclude='._*' MarkViewer.app
           mv MarkViewer_universal.app.tar.gz ${{ github.workspace }}/
 
       - name: Sign update bundle
