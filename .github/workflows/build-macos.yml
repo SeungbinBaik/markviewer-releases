@@ -129,13 +129,14 @@ jobs:
 
       - name: Create DMG
         run: |
-          # Check if script exists, otherwise use simple approach
-          if [ -f "scripts/create-dmg.sh" ]; then
-            bash scripts/create-dmg.sh /tmp/universal-build/MarkViewer.app MarkViewer.dmg
-          else
-            # Fallback: use hdiutil directly
-            hdiutil create -volname "MarkViewer" -srcfolder /tmp/universal-build/MarkViewer.app -ov -format UDZO MarkViewer.dmg
-          fi
+          # Create DMG without compression (avoid mount permission issues)
+          hdiutil create -volname "MarkViewer" -srcfolder /tmp/universal-build/MarkViewer.app -ov -format UDRW temp.dmg
+
+          # Convert to compressed read-only DMG
+          hdiutil convert temp.dmg -format UDZO -o MarkViewer.dmg
+
+          # Clean up
+          rm temp.dmg
 
       - name: Sign DMG
         env:
