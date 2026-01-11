@@ -98,10 +98,10 @@ jobs:
             # Unlock build keychain
             security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
 
-            # Find the Developer ID identity name (not hash)
-            SIGNING_IDENTITY=$(security find-identity -v build.keychain | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/')
+            # Use SHA-1 hash directly (codesign accepts this)
+            SIGNING_IDENTITY=$(security find-identity -v build.keychain | grep "Developer ID Application" | head -1 | awk '{print $2}')
 
-            echo "Using identity: $SIGNING_IDENTITY"
+            echo "Using identity SHA-1: $SIGNING_IDENTITY"
 
             codesign --force --deep --sign "$SIGNING_IDENTITY" \
               --options runtime \
@@ -126,10 +126,10 @@ jobs:
             # Unlock build keychain
             security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
 
-            # Find the Developer ID identity name (not hash)
-            SIGNING_IDENTITY=$(security find-identity -v build.keychain | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/')
+            # Use SHA-1 hash directly (codesign accepts this)
+            SIGNING_IDENTITY=$(security find-identity -v build.keychain | grep "Developer ID Application" | head -1 | awk '{print $2}')
 
-            echo "Using identity: $SIGNING_IDENTITY"
+            echo "Using identity SHA-1: $SIGNING_IDENTITY"
 
             codesign --force --sign "$SIGNING_IDENTITY" \
               --keychain build.keychain \
