@@ -91,14 +91,21 @@ jobs:
               src-tauri/target/x86_64-apple-darwin/release/bundle/macos/MarkViewer.app/Contents/MacOS/app \
               -output /tmp/universal-build/MarkViewer.app/Contents/MacOS/app
 
-      - name: Sign universal app
-        env:
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-        run: |
-          codesign --force --deep --sign "$APPLE_SIGNING_IDENTITY" \
-            --options runtime \
-            --entitlements src-tauri/entitlements.plist \
-            /tmp/universal-build/MarkViewer.app
+        - name: Sign universal app
+          env:
+            KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          run: |
+            # Unlock build keychain
+            security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+
+            # Find the Developer ID identity from build keychain
+            SIGNING_IDENTITY=$(security find-identity -v build.keychain | grep "Developer ID Application" | head -1 | awk '{print $2}')
+
+            codesign --force --deep --sign "$SIGNING_IDENTITY" \
+              --options runtime \
+              --entitlements src-tauri/entitlements.plist \
+              --keychain build.keychain \
+              /tmp/universal-build/MarkViewer.app
 
       - name: Create DMG
         run: |
@@ -110,11 +117,19 @@ jobs:
             hdiutil create -volname "MarkViewer" -srcfolder /tmp/universal-build/MarkViewer.app -ov -format UDZO MarkViewer.dmg
           fi
 
-      - name: Sign DMG
-        env:
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-        run: |
-          codesign --force --sign "$APPLE_SIGNING_IDENTITY" MarkViewer.dmg
+        - name: Sign DMG
+          env:
+            KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          run: |
+            # Unlock build keychain
+            security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+
+            # Find the Developer ID identity from build keychain
+            SIGNING_IDENTITY=$(security find-identity -v build.keychain | grep "Developer ID Application" | head -1 | awk '{print $2}')
+
+            codesign --force --sign "$SIGNING_IDENTITY" \
+              --keychain build.keychain \
+              MarkViewer.dmg
 
       - name: Notarize DMG
         env:
