@@ -87,9 +87,9 @@ jobs:
           mkdir -p /tmp/universal-build
           cp -R src-tauri/target/aarch64-apple-darwin/release/bundle/macos/MarkViewer.app /tmp/universal-build/
           lipo -create \
-            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/MarkViewer.app/Contents/MacOS/MarkViewer \
-            src-tauri/target/x86_64-apple-darwin/release/bundle/macos/MarkViewer.app/Contents/MacOS/MarkViewer \
-            -output /tmp/universal-build/MarkViewer.app/Contents/MacOS/MarkViewer
+              src-tauri/target/aarch64-apple-darwin/release/bundle/macos/MarkViewer.app/Contents/MacOS/app \
+              src-tauri/target/x86_64-apple-darwin/release/bundle/macos/MarkViewer.app/Contents/MacOS/app \
+              -output /tmp/universal-build/MarkViewer.app/Contents/MacOS/app
 
       - name: Sign universal app
         env:
