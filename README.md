@@ -8,7 +8,7 @@ Visit the [Releases](https://github.com/SeungbinBaik/markviewer-releases/release
 
 ## Website
 
-https://markviewer.vercel.app
+https://markviewer.com
 
 ## System Requirements
 
