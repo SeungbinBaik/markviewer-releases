@@ -125,14 +125,21 @@ jobs:
 
       - name: Create DMG
         run: |
-          # Create DMG without compression (avoid mount permission issues)
-          hdiutil create -volname "MarkViewer" -srcfolder /tmp/universal-build/MarkViewer.app -ov -format UDRW temp.dmg
+          # Install create-dmg for better DMG creation with Applications folder link
+          brew install create-dmg || true
 
-          # Convert to compressed read-only DMG
-          hdiutil convert temp.dmg -format UDZO -o MarkViewer.dmg
-
-          # Clean up
-          rm temp.dmg
+          # Create DMG with Applications folder shortcut
+          create-dmg \
+            --volname "MarkViewer" \
+            --window-pos 200 120 \
+            --window-size 660 400 \
+            --icon-size 100 \
+            --icon "MarkViewer.app" 180 170 \
+            --hide-extension "MarkViewer.app" \
+            --app-drop-link 480 170 \
+            --no-internet-enable \
+            MarkViewer.dmg \
+            /tmp/universal-build/
 
       - name: Sign DMG
         env:
