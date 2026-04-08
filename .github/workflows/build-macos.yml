@@ -55,6 +55,17 @@ jobs:
           # Use local npm cache for faster installs
           npm install --prefer-offline --no-audit
 
+      - name: Create .env for analytics
+        env:
+          VITE_POSTHOG_API_KEY: ${{ secrets.VITE_POSTHOG_API_KEY }}
+        run: |
+          cat > .env <<EOF
+          VITE_POSTHOG_API_KEY=${VITE_POSTHOG_API_KEY}
+          VITE_POSTHOG_HOST=https://app.posthog.com
+          VITE_POSTHOG_ENABLED=true
+          VITE_ENVIRONMENT=production
+          EOF
+
       - name: Build frontend
         run: npm run build:vite
 
