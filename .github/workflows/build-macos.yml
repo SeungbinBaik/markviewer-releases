@@ -254,20 +254,24 @@ jobs:
           repository: SeungbinBaik/markviewer
           token: ${{ secrets.RELEASE_PAT }}
 
-      - name: Update download links in index.html
+      # Note: download links and version display are fetched dynamically at runtime
+      # from the GitHub Releases API (see fetchLatestVersion() in each HTML page).
+      # This job only updates the static softwareVersion field in JSON-LD, which
+      # crawlers read before executing JavaScript.
+      - name: Update softwareVersion in JSON-LD schema
         run: |
           VERSION="${{ needs.build-macos.outputs.version }}"
-
-          # Update LATEST_VERSION variable (without 'v' prefix - website adds it in URL)
-          sed -i "s/const LATEST_VERSION = .*/const LATEST_VERSION = '${VERSION}';/" index.html
-
-          # Update softwareVersion in JSON-LD schema
           sed -i "s/\"softwareVersion\": \".*\"/\"softwareVersion\": \"${VERSION}\"/" index.html
 
       - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Only commit if something actually changed
+          if git diff --quiet index.html; then
+            echo "No changes to softwareVersion — skipping commit."
+            exit 0
+          fi
           git add index.html
-          git commit -m "Update download links to v${{ needs.build-macos.outputs.version }}"
+          git commit -m "Bump softwareVersion JSON-LD to v${{ needs.build-macos.outputs.version }}"
           git push
