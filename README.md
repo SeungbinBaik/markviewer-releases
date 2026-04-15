@@ -2,7 +2,7 @@
 
 Public release repository for **MarkViewer**, a minimal markdown editor for macOS.
 
-This repository is used to distribute signed release artifacts for end users and update metadata for in-app updates. The application source code lives in a separate private repository.
+This repository provides public release downloads for end users. The application source code lives in a separate private repository.
 
 ## Website
 
@@ -36,16 +36,6 @@ Each release can include:
 - macOS only
 - Universal binary for Apple Silicon and Intel Macs
 - Tauri-based desktop packaging
-
-## Release Pipeline
-
-This repository publishes builds produced by GitHub Actions. The workflow:
-
-- downloads tagged source from the private app repository
-- builds separate `aarch64-apple-darwin` and `x86_64-apple-darwin` binaries
-- merges them into a universal `.app`
-- signs and notarizes the distributable with Apple tooling
-- uploads release assets and updater metadata to GitHub Releases
 
 ## Notes
 
