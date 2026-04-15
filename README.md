@@ -1,34 +1,61 @@
 # MarkViewer Releases
 
-Official releases and downloads for **MarkViewer** - A minimal markdown editor for macOS.
+Public release repository for **MarkViewer**, a minimal markdown editor for macOS.
 
-## Download
-
-Visit the [Releases](https://github.com/SeungbinBaik/markviewer-releases/releases) page to download the latest version.
+This repository is used to distribute signed release artifacts for end users and update metadata for in-app updates. The application source code lives in a separate private repository.
 
 ## Website
 
-https://markviewer.com
+- https://markviewer.com
 
-## System Requirements
+## Download
 
-- macOS 10.13 (High Sierra) or later
-- Universal Binary: Intel & Apple Silicon (M1/M2/M3) supported
+- Latest releases: https://github.com/SeungbinBaik/markviewer-releases/releases
+- macOS installer: download the latest `MarkViewer.dmg` asset from the Releases page
 
-## Features
+## What MarkViewer Offers
 
-- ✨ WYSIWYG markdown editor
-- 📑 Automatic table of contents
-- 🎨 Minimal and clean design
-- ⌨️ Intuitive keyboard shortcuts
-- 🔄 Real-time preview
-- 📝 GitHub Flavored Markdown support
-- 🍎 Native Apple Silicon support
+- Minimal writing experience focused on markdown editing
+- Real-time editing and preview workflow
+- WYSIWYG-style markdown authoring
+- Automatic table of contents generation
+- GitHub Flavored Markdown support
+- Keyboard-driven editing with native macOS app packaging
+
+## Release Artifacts
+
+Each release can include:
+
+- `MarkViewer.dmg`: signed and notarized macOS installer
+- `MarkViewer_universal.app.tar.gz`: update bundle for in-app updates
+- `MarkViewer_universal.app.tar.gz.sig`: Tauri updater signature
+- `latest.json`: updater manifest consumed by the app
+
+## Platform Support
+
+- macOS only
+- Universal binary for Apple Silicon and Intel Macs
+- Tauri-based desktop packaging
+
+## Release Pipeline
+
+This repository publishes builds produced by GitHub Actions. The workflow:
+
+- downloads tagged source from the private app repository
+- builds separate `aarch64-apple-darwin` and `x86_64-apple-darwin` binaries
+- merges them into a universal `.app`
+- signs and notarizes the distributable with Apple tooling
+- uploads release assets and updater metadata to GitHub Releases
+
+## Notes
+
+- This repository is for release distribution, not day-to-day application development.
+- If you want the latest packaged version of MarkViewer, use the Releases page linked above.
 
 ## License
 
-MIT License
+Release artifacts and repository contents are distributed under the MIT License unless stated otherwise.
 
 ---
 
-© 2024 MarkViewer
+© 2026 MarkViewer
