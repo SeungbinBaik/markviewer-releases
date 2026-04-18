@@ -1,0 +1,56 @@
+name: Rollback Beta Manifest
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Either a commit SHA on main whose manifests/latest-beta.json to restore, OR the literal "stable" to make latest-beta byte-for-byte equal to the current latest.json'
+        required: true
+        type: string
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout markviewer-releases
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PAT }}
+
+      - name: Restore manifests/latest-beta.json
+        run: |
+          TARGET="${{ inputs.target }}"
+          mkdir -p manifests
+
+          if [ "$TARGET" == "stable" ]; then
+            # Mirror current stable latest.json so beta clients rejoin stable
+            # on the next check. latest.json itself is not touched.
+            curl -fsSL -o /tmp/stable-latest.json \
+              https://github.com/SeungbinBaik/markviewer-releases/releases/latest/download/latest.json
+            cp /tmp/stable-latest.json manifests/latest-beta.json
+          else
+            # Restore content from the given commit SHA on main.
+            git show "$TARGET:manifests/latest-beta.json" > /tmp/target-manifest.json
+            cp /tmp/target-manifest.json manifests/latest-beta.json
+          fi
+
+      - name: Verify restored manifest is valid JSON with platforms
+        run: |
+          jq -e '.version and .platforms["darwin-aarch64"].url and .platforms["darwin-x86_64"].url' \
+            manifests/latest-beta.json > /dev/null || {
+            echo "::error::restored manifests/latest-beta.json is not a valid updater manifest";
+            exit 1;
+          }
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifests/latest-beta.json
+          if git diff --cached --quiet; then
+            echo "manifests/latest-beta.json already at requested target; no commit"
+            exit 0
+          fi
+          git commit -m "chore(manifest): rollback latest-beta.json (target=${{ inputs.target }})"
+          git push origin main
