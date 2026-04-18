@@ -6,24 +6,37 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to build (e.g., 1.0.26)'
+        description: 'Version to build (e.g., 1.0.26 or 1.0.26-beta.1)'
         required: true
         type: string
+      channel:
+        description: 'Release channel'
+        required: false
+        default: 'stable'
+        type: choice
+        options:
+          - stable
+          - beta
 
 jobs:
   build-macos:
     runs-on: self-hosted
     outputs:
       version: ${{ steps.version.outputs.VERSION }}
+      channel: ${{ steps.version.outputs.CHANNEL }}
 
     steps:
-      - name: Get version
+      - name: Get version and channel
         id: version
         run: |
           if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
             echo "VERSION=${{ github.event.client_payload.version }}" >> $GITHUB_OUTPUT
+            PAYLOAD_CHANNEL="${{ github.event.client_payload.channel }}"
+            echo "CHANNEL=${PAYLOAD_CHANNEL:-stable}" >> $GITHUB_OUTPUT
           else
             echo "VERSION=${{ inputs.version }}" >> $GITHUB_OUTPUT
+            INPUT_CHANNEL="${{ inputs.channel }}"
+            echo "CHANNEL=${INPUT_CHANNEL:-stable}" >> $GITHUB_OUTPUT
           fi
 
       - name: Clean workspace
@@ -201,20 +214,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
+          PRERELEASE_FLAG=""
+          if [ "${{ steps.version.outputs.CHANNEL }}" == "beta" ]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+
           gh release create v${{ steps.version.outputs.VERSION }} \
             --repo SeungbinBaik/markviewer-releases \
             --title "MarkViewer v${{ steps.version.outputs.VERSION }}" \
             --notes "Release v${{ steps.version.outputs.VERSION }}" \
+            $PRERELEASE_FLAG \
             MarkViewer.dmg \
             MarkViewer_universal.app.tar.gz \
             MarkViewer_universal.app.tar.gz.sig
 
-      - name: Update manifest
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
+      - name: Generate manifest JSON
+        id: manifest
         run: |
-          # Create latest.json with update information
-          cat > latest.json <<EOF
+          cat > generated-manifest.json <<EOF
           {
             "version": "v${{ steps.version.outputs.VERSION }}",
             "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
@@ -231,10 +248,63 @@ jobs:
           }
           EOF
 
+      - name: Upload latest.json (stable only)
+        if: steps.version.outputs.CHANNEL == 'stable'
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          cp generated-manifest.json latest.json
           gh release upload v${{ steps.version.outputs.VERSION }} \
             --repo SeungbinBaik/markviewer-releases \
             --clobber \
             latest.json
+
+      - name: Checkout markviewer-releases for manifest sync
+        uses: actions/checkout@v4
+        with:
+          repository: SeungbinBaik/markviewer-releases
+          ref: main
+          path: releases-repo
+          token: ${{ secrets.RELEASE_PAT }}
+
+      - name: Sync manifests/latest-beta.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          cd releases-repo
+          mkdir -p manifests
+          cp ../generated-manifest.json manifests/latest-beta.json
+
+          # Stable sync integrity: the just-written manifests/latest-beta.json
+          # must be byte-for-byte equal to the latest.json release asset so
+          # beta users naturally rejoin stable on the next check. Abort on
+          # mismatch rather than risk publishing inconsistent state.
+          if [ "${{ steps.version.outputs.CHANNEL }}" == "stable" ]; then
+            diff -q ../latest.json manifests/latest-beta.json || {
+              echo "::error::latest.json and manifests/latest-beta.json differ byte-level on stable sync";
+              exit 1;
+            }
+          fi
+
+          # URL sanity: the manifest's DMG url must point to this tag's
+          # release assets. This guards against a beta-tag URL leaking into
+          # a stable sync or vice versa.
+          jq -e --arg tag "v${{ steps.version.outputs.VERSION }}" \
+            '.platforms | to_entries[] | .value.url | contains("/releases/download/" + $tag + "/")' \
+            manifests/latest-beta.json > /dev/null || {
+            echo "::error::manifests/latest-beta.json URL does not point to v${{ steps.version.outputs.VERSION }} release assets";
+            exit 1;
+          }
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifests/latest-beta.json
+          if git diff --cached --quiet; then
+            echo "manifests/latest-beta.json unchanged, skipping commit"
+            exit 0
+          fi
+          git commit -m "chore(manifest): sync latest-beta.json for v${{ steps.version.outputs.VERSION }} (${{ steps.version.outputs.CHANNEL }})"
+          git push origin main
 
       - name: Clean up
         if: always()
@@ -245,6 +315,7 @@ jobs:
 
   update-website:
     needs: build-macos
+    if: needs.build-macos.outputs.channel != 'beta'
     runs-on: ubuntu-latest
 
     steps:
