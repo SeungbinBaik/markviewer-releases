@@ -260,7 +260,7 @@ jobs:
             latest.json
 
       - name: Checkout markviewer-releases for manifest sync
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: SeungbinBaik/markviewer-releases
           ref: main
@@ -320,7 +320,7 @@ jobs:
 
     steps:
       - name: Checkout website repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: SeungbinBaik/markviewer
           token: ${{ secrets.RELEASE_PAT }}
