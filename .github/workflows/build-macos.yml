@@ -309,6 +309,16 @@ jobs:
       - name: Clean up
         if: always()
         run: |
+          # Restore user keychain state — the Setup code signing step
+          # set default-keychain to build.keychain and rewrote the user
+          # search list. On a self-hosted runner that's the user's own
+          # Mac, so without explicit restore here every build leaves
+          # the host with a broken default-keychain pointer (-25307
+          # "no default keychain") and login.keychain dropped from the
+          # search list. Run before delete-keychain so the build.keychain
+          # vanishing doesn't leave a phantom default.
+          security default-keychain -s ~/Library/Keychains/login.keychain-db || true
+          security list-keychains -d user -s ~/Library/Keychains/login.keychain-db /Library/Keychains/System.keychain || true
           security delete-keychain build.keychain || true
           rm -rf ${{ github.workspace }}/*
           rm -rf ${{ github.workspace }}/.??*
