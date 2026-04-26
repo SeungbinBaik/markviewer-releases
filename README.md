@@ -1,51 +1,60 @@
-# MarkViewer Releases
+# MarkViewer
 
-Public release repository for **MarkViewer**, a minimal markdown editor for macOS.
+> **Native macOS markdown viewer for reviewing AI-generated docs.**
+> Annotate inline, hand off to Claude or ChatGPT in one keystroke. 100% offline. Free.
 
-This repository provides public release downloads for end users. The application source code lives in a separate private repository.
+[![Latest Release](https://img.shields.io/github/v/release/SeungbinBaik/markviewer-releases?label=download)](https://github.com/SeungbinBaik/markviewer-releases/releases/latest)
+[![macOS](https://img.shields.io/badge/macOS-10.13%2B-blue)](https://markviewer.com)
+[![Website](https://img.shields.io/badge/site-markviewer.com-3b82f6)](https://markviewer.com)
 
-## Website
+![MarkViewer screenshot](https://markviewer.com/assets/screenshot.png)
 
-- https://markviewer.com
+## Why MarkViewer
 
-## Download
+AI writes drafts. Humans review them. MarkViewer is built for **review** — open a `.md` file, annotate any passage, and hand it off to your AI assistant.
 
-- Latest releases: https://github.com/SeungbinBaik/markviewer-releases/releases
-- macOS installer: download the latest `MarkViewer.dmg` asset from the Releases page
+- `⌘⇧R` — leave an inline review comment on selected text
+- `⌘⇧↵` — open an editable prompt panel pre-filled with your annotations
+- Paste into Claude, ChatGPT, Cursor, Gemini, Copilot — anywhere that takes text
+- Annotations persist as HTML comments inside the markdown — no lock-in
 
-## What MarkViewer Offers
+## Quick start
 
-- Minimal writing experience focused on markdown editing
-- Real-time editing and preview workflow
-- WYSIWYG-style markdown authoring
-- Automatic table of contents generation
-- GitHub Flavored Markdown support
-- Keyboard-driven editing with native macOS app packaging
+1. **[Download `MarkViewer.dmg`](https://github.com/SeungbinBaik/markviewer-releases/releases/latest)** — Universal binary, signed & notarized
+2. Drag to `Applications` and launch
+3. Double-click any `.md` file — or set MarkViewer as your default app for `.md`
 
-## Release Artifacts
+## Features
 
-Each release can include:
+- **Real-time WYSIWYG markdown** — type and render in one view, no preview pane to toggle
+- **GitHub Flavored Markdown** — tables, task lists, code highlighting, Mermaid diagrams
+- **AI Review Loop** — annotate + hand off to any AI assistant; clipboard only on explicit click
+- **Auto Table of Contents** — navigate long documents from the left rail
+- **Multi-tab & multi-window** — review several files side by side
+- **100% offline** — your files never leave your Mac, no API key required
 
-- `MarkViewer.dmg`: signed and notarized macOS installer
-- `MarkViewer_universal.app.tar.gz`: update bundle for in-app updates
-- `MarkViewer_universal.app.tar.gz.sig`: Tauri updater signature
-- `latest.json`: updater manifest consumed by the app
+## Compared to alternatives
 
-## Platform Support
+| Alternative | Best for | Where MarkViewer fits |
+|---|---|---|
+| Full-featured markdown editors | Long-form writing | Lightweight preview without the weight |
+| Code editors with markdown plugins | Devs already in an IDE | Sub-second launch, no workspace to load |
+| Browser-based previewers | One-off rendering | Fully offline — files stay on your Mac |
+| macOS Quick Look | Plain-text glance | Real GFM rendering plus AI handoff |
 
-- macOS only
-- Universal binary for Apple Silicon and Intel Macs
-- Tauri-based desktop packaging
+## Privacy
 
-## Notes
+- 100% offline operation. No file content, paths, or names ever leave your Mac.
+- Anonymous usage analytics are **opt-in** (Settings → Privacy & Analytics).
+- Full policy: https://markviewer.com/privacy
 
-- This repository is for release distribution, not day-to-day application development.
-- If you want the latest packaged version of MarkViewer, use the Releases page linked above.
+## Links
+
+- Website — https://markviewer.com
+- Releases — https://github.com/SeungbinBaik/markviewer-releases/releases
+- Issues — https://github.com/SeungbinBaik/markviewer-releases/issues
+- Support — https://www.buymeacoffee.com/markviewer
 
 ## License
 
-Release artifacts and repository contents are distributed under the MIT License unless stated otherwise.
-
----
-
-© 2026 MarkViewer
+MIT
