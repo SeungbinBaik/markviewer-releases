@@ -335,24 +335,32 @@ jobs:
           repository: SeungbinBaik/markviewer
           token: ${{ secrets.RELEASE_PAT }}
 
-      # Note: download links and version display are fetched dynamically at runtime
-      # from the GitHub Releases API (see fetchLatestVersion() in each HTML page).
-      # This job only updates the static softwareVersion field in JSON-LD, which
-      # crawlers read before executing JavaScript.
-      - name: Update softwareVersion in JSON-LD schema
+      # Single source of truth for every crawler-/LLM-readable version string
+      # on markviewer.com lives in scripts/sync-version.sh. That script touches
+      # index.html (JSON-LD softwareVersion + JS fallback), version.js, llms.txt,
+      # sitemap.xml lastmod, and the subpage footer date. Runtime
+      # fetchLatestVersion() still updates the visible download UI, but crawlers
+      # and the no-JS path now see correct values too.
+      - name: Sync version strings on website
         run: |
-          VERSION="${{ needs.build-macos.outputs.version }}"
-          sed -i "s/\"softwareVersion\": \".*\"/\"softwareVersion\": \"${VERSION}\"/" index.html
+          if [ -x ./scripts/sync-version.sh ]; then
+            ./scripts/sync-version.sh "${{ needs.build-macos.outputs.version }}"
+          else
+            # Safety net: if the website repo is somehow missing the sync script
+            # (e.g. an out-of-order revert), keep the JSON-LD softwareVersion in
+            # sync at minimum so we don't regress the previous narrow behavior.
+            echo "::warning::scripts/sync-version.sh missing — falling back to softwareVersion-only update"
+            sed -i "s/\"softwareVersion\": \"[^\"]*\"/\"softwareVersion\": \"${{ needs.build-macos.outputs.version }}\"/" index.html
+          fi
 
       - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Only commit if something actually changed
-          if git diff --quiet index.html; then
-            echo "No changes to softwareVersion — skipping commit."
+          if git diff --quiet; then
+            echo "Website already in sync — skipping commit."
             exit 0
           fi
-          git add index.html
-          git commit -m "Bump softwareVersion JSON-LD to v${{ needs.build-macos.outputs.version }}"
+          git add -A
+          git commit -m "Sync website to v${{ needs.build-macos.outputs.version }}"
           git push
