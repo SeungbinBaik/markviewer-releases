@@ -1,14 +1,14 @@
 {
-  "version": "v1.5.1",
-  "pub_date": "2026-06-09T22:05:27Z",
+  "version": "v1.5.2-beta.1",
+  "pub_date": "2026-06-13T00:41:14Z",
   "platforms": {
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRN2dDSkh1U3VYT2k1RS8xM0tPdEpITnpHUThwY2lCNDhBV05wak9ER3FFUEp0NjFKRjR3eHdjMmlPWHB6V3dpT2xldXFpTUp4bGNaN05WTmVEZnBoTkJuQjBHWkdZdFFBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMDQyNzA5CWZpbGU6TWFya1ZpZXdlcl91bml2ZXJzYWwuYXBwLnRhci5negpTV0tHSUp4K2FmazgwMWtvTGN6STBWWWMvVitSNWgzOTVTUE5tcDBMTEhNM3ZhLzZPazVYVVhvT1JSQUpEZkNKdEZDMTRubkdEdFVwTXhIS1BPQjZCZz09Cg==",
-      "url": "https://github.com/SeungbinBaik/markviewer-releases/releases/download/v1.5.1/MarkViewer_universal.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRN2dDSkh1U3VYT2srL0dQWmxlNUtqZWdnbXRpK25SbENXbDk3NzRzYzFlSjlpZy85TVZVTS80THRKQWlkcG5BNm8zSnQ4VmhkSFBnZE5lV005a0lJaEJvOEVlZE9qRFFNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMzExMjU5CWZpbGU6TWFya1ZpZXdlcl91bml2ZXJzYWwuYXBwLnRhci5negppTk9RUWZJbmdzc085Y0ZhV2NaajQ1QVkzcjQ2enU5MVdkOUhZWFlKa1ZjaXVnemNzTTlXOXFoNGNmRndtcEtUWUQ0R3VTa0JmL2FuMTA4V09DTHNDUT09Cg==",
+      "url": "https://github.com/SeungbinBaik/markviewer-releases/releases/download/v1.5.2-beta.1/MarkViewer_universal.app.tar.gz"
     },
     "darwin-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRN2dDSkh1U3VYT2k1RS8xM0tPdEpITnpHUThwY2lCNDhBV05wak9ER3FFUEp0NjFKRjR3eHdjMmlPWHB6V3dpT2xldXFpTUp4bGNaN05WTmVEZnBoTkJuQjBHWkdZdFFBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMDQyNzA5CWZpbGU6TWFya1ZpZXdlcl91bml2ZXJzYWwuYXBwLnRhci5negpTV0tHSUp4K2FmazgwMWtvTGN6STBWWWMvVitSNWgzOTVTUE5tcDBMTEhNM3ZhLzZPazVYVVhvT1JSQUpEZkNKdEZDMTRubkdEdFVwTXhIS1BPQjZCZz09Cg==",
-      "url": "https://github.com/SeungbinBaik/markviewer-releases/releases/download/v1.5.1/MarkViewer_universal.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRN2dDSkh1U3VYT2srL0dQWmxlNUtqZWdnbXRpK25SbENXbDk3NzRzYzFlSjlpZy85TVZVTS80THRKQWlkcG5BNm8zSnQ4VmhkSFBnZE5lV005a0lJaEJvOEVlZE9qRFFNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMzExMjU5CWZpbGU6TWFya1ZpZXdlcl91bml2ZXJzYWwuYXBwLnRhci5negppTk9RUWZJbmdzc085Y0ZhV2NaajQ1QVkzcjQ2enU5MVdkOUhZWFlKa1ZjaXVnemNzTTlXOXFoNGNmRndtcEtUWUQ0R3VTa0JmL2FuMTA4V09DTHNDUT09Cg==",
+      "url": "https://github.com/SeungbinBaik/markviewer-releases/releases/download/v1.5.2-beta.1/MarkViewer_universal.app.tar.gz"
     }
   }
 }
