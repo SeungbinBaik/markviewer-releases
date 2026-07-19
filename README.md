@@ -6,6 +6,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/SeungbinBaik/markviewer-releases?label=download)](https://github.com/SeungbinBaik/markviewer-releases/releases/latest)
 [![macOS](https://img.shields.io/badge/macOS-10.13%2B-blue)](https://markviewer.com)
 [![Website](https://img.shields.io/badge/site-markviewer.com-3b82f6)](https://markviewer.com)
+[![Buy Me a Coffee](https://img.shields.io/badge/support-MarkViewer-FFDD00?logo=buy-me-a-coffee&logoColor=000)](https://www.buymeacoffee.com/markviewer)
 
 ![MarkViewer screenshot](https://markviewer.com/assets/screenshot.png)
 
@@ -57,4 +58,4 @@ AI writes drafts. Humans review them. MarkViewer is built for **review** — ope
 
 ## License
 
-MIT
+MarkViewer is proprietary software. All rights reserved.
