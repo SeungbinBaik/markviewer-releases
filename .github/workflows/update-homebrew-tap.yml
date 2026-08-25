@@ -1,0 +1,87 @@
+name: Update Homebrew Tap
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version to sync the tap to (e.g., 1.8.1) — use for re-sync or rollback'
+        required: true
+        type: string
+
+jobs:
+  update-tap:
+    runs-on: ubuntu-latest
+    # Guard: never ship prereleases to the tap (dispatch runs are validated below)
+    if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false
+    steps:
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          VERSION="${VERSION#v}"
+
+          # Stable-only guard: reject anything that is not plain x.y.z
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::'$VERSION' is not a stable x.y.z version; refusing to update the tap"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Compute and cross-check sha256
+        id: sha
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          curl -fsSL -o MarkViewer.dmg \
+            "https://github.com/SeungbinBaik/markviewer-releases/releases/download/v${VERSION}/MarkViewer.dmg"
+          LOCAL_SHA=$(shasum -a 256 MarkViewer.dmg | awk '{print $1}')
+
+          API_SHA=$(gh api "repos/SeungbinBaik/markviewer-releases/releases/tags/v${VERSION}" \
+            --jq '.assets[] | select(.name == "MarkViewer.dmg") | .digest' | sed 's/^sha256://')
+
+          if [ -z "$API_SHA" ] || [ "$LOCAL_SHA" != "$API_SHA" ]; then
+            echo "::error::sha256 mismatch or missing digest (local=$LOCAL_SHA api=$API_SHA)"
+            exit 1
+          fi
+          echo "SHA256=$LOCAL_SHA" >> $GITHUB_OUTPUT
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v5
+        with:
+          repository: SeungbinBaik/homebrew-tap
+          token: ${{ secrets.TAP_PUSH_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update cask
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          SHA256="${{ steps.sha.outputs.SHA256 }}"
+          CASK=homebrew-tap/Casks/markviewer.rb
+
+          sed -i -E "s/^  version \"[^\"]+\"/  version \"${VERSION}\"/" "$CASK"
+          sed -i -E "s/^  sha256 \"[^\"]+\"/  sha256 \"${SHA256}\"/" "$CASK"
+
+          # Verify the substitutions actually landed
+          grep -q "version \"${VERSION}\"" "$CASK" || { echo "::error::version substitution failed"; exit 1; }
+          grep -q "sha256 \"${SHA256}\"" "$CASK" || { echo "::error::sha256 substitution failed"; exit 1; }
+          ruby -c "$CASK"
+
+      - name: Commit and push
+        run: |
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/markviewer.rb
+          if git diff --cached --quiet; then
+            echo "Tap already at ${{ steps.version.outputs.VERSION }}; nothing to do"
+            exit 0
+          fi
+          git commit -m "markviewer ${{ steps.version.outputs.VERSION }}"
+          git push origin main
