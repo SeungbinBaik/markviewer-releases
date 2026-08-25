@@ -25,6 +25,13 @@ AI writes drafts. Humans review them. MarkViewer is built for **review** — ope
 2. Drag to `Applications` and launch
 3. Double-click any `.md` file — or set MarkViewer as your default app for `.md`
 
+Or install with [Homebrew](https://github.com/SeungbinBaik/homebrew-tap):
+
+```sh
+brew tap SeungbinBaik/tap
+brew install --cask markviewer
+```
+
 ## Features
 
 - **Real-time WYSIWYG markdown** — type and render in one view, no preview pane to toggle
