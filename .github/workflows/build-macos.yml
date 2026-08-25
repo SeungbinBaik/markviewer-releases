@@ -20,7 +20,13 @@ on:
 
 jobs:
   build-macos:
-    runs-on: self-hosted
+    # Pinned by capability, not by machine name. `create-dmg` drives Finder
+    # over AppleScript to lay out the DMG window, which only works on a
+    # runner whose service can reach the logged-in Finder. The MacMini
+    # runner cannot (AppleEvent -1712 after 120s), and with identical
+    # labels GitHub picked it at random and the release failed. Give a
+    # runner the `dmg-capable` label once it is verified to build a DMG.
+    runs-on: [self-hosted, macOS, ARM64, dmg-capable]
     outputs:
       version: ${{ steps.version.outputs.VERSION }}
       channel: ${{ steps.version.outputs.CHANNEL }}
