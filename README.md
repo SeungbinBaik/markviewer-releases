@@ -74,3 +74,4 @@ brew install --cask markviewer
 ## License
 
 MarkViewer is proprietary software. All rights reserved.
+See [LICENSE](LICENSE) for the full terms.

@@ -1,0 +1,46 @@
+MarkViewer — Proprietary Software License
+
+Copyright (c) 2026 Seungbin Baik. All rights reserved.
+
+MarkViewer is proprietary software. Its source code is not public, and no
+rights are granted other than those stated below.
+
+This repository hosts the compiled releases of MarkViewer and the metadata
+needed to install them. This license governs both.
+
+PERMITTED
+
+  You may download, install, and use MarkViewer on devices you own or
+  control, for personal or commercial purposes, at no charge.
+
+NOT PERMITTED
+
+  You may not modify, adapt, translate, or create derivative works of the
+  software.
+
+  You may not reverse engineer, decompile, or disassemble the software,
+  except to the extent applicable law expressly permits despite this
+  limitation.
+
+  You may not sell, rent, lease, sublicense, or otherwise redistribute the
+  software or any part of it.
+
+  You may not remove or alter any copyright, trademark, or other
+  proprietary notice.
+
+NO WARRANTY
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+  IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES,
+  OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE,
+  ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  OTHER DEALINGS IN THE SOFTWARE.
+
+THIRD-PARTY COMPONENTS
+
+  MarkViewer includes open-source components licensed by their respective
+  authors. Their licenses are listed inside the application under the
+  MarkViewer menu → "Open Source Licenses...", and those terms govern
+  those components.
