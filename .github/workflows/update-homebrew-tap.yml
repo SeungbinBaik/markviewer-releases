@@ -1,29 +1,31 @@
-name: Update Homebrew Tap
+name: Update Homebrew Tap (retired)
+
+# MarkViewer landed in homebrew-cask on 2026-08-31
+# (Homebrew/homebrew-cask#284237). BrewTestBot autobumps that cask from the
+# same GitHub releases every 3 hours, so the tap no longer needs to track
+# stable releases — and keeping both would define the `markviewer` token
+# twice for anyone who still has this tap.
+#
+# The release trigger is therefore removed. The tap cask is deprecated and
+# frozen at 1.8.4. This workflow stays dispatch-only so the tap can still be
+# re-synced by hand if the homebrew-cask entry ever has to be rolled back.
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version to sync the tap to (e.g., 1.8.1) — use for re-sync or rollback'
+        description: 'Release version to sync the tap to (e.g., 1.8.1) — manual rollback only; the tap is retired'
         required: true
         type: string
 
 jobs:
   update-tap:
     runs-on: ubuntu-latest
-    # Guard: never ship prereleases to the tap (dispatch runs are validated below)
-    if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false
     steps:
       - name: Determine version
         id: version
         run: |
-          if [ "${{ github.event_name }}" == "release" ]; then
-            VERSION="${{ github.event.release.tag_name }}"
-          else
-            VERSION="${{ inputs.version }}"
-          fi
+          VERSION="${{ inputs.version }}"
           VERSION="${VERSION#v}"
 
           # Stable-only guard: reject anything that is not plain x.y.z
