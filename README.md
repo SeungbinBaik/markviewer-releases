@@ -1,21 +1,29 @@
 # MarkViewer
 
-> **Native macOS markdown viewer for reviewing AI-generated docs.**
-> Annotate inline, hand off to Claude or ChatGPT in one keystroke. 100% offline. Free.
+> **Free, native Markdown viewer and editor for macOS.**
+> Open `.md` files instantly with live WYSIWYG and an auto table of contents.
+> Optionally, run the Claude Code or Codex CLI already on your Mac to draft or
+> revise a document — and review the diff before anything is applied. 100% offline. Free.
 
 [![Latest Release](https://img.shields.io/github/v/release/SeungbinBaik/markviewer-releases?label=download)](https://github.com/SeungbinBaik/markviewer-releases/releases/latest)
-[![macOS](https://img.shields.io/badge/macOS-10.13%2B-blue)](https://markviewer.com)
-[![Website](https://img.shields.io/badge/site-markviewer.com-3b82f6)](https://markviewer.com)
+[![macOS](https://img.shields.io/badge/macOS-10.15%2B-blue)](https://markviewer.com)
+[![Website](https://img.shields.io/badge/site-markviewer.com-2563eb)](https://markviewer.com)
 [![Buy Me a Coffee](https://img.shields.io/badge/support-MarkViewer-FFDD00?logo=buy-me-a-coffee&logoColor=000)](https://www.buymeacoffee.com/markviewer)
 
-![MarkViewer screenshot](https://markviewer.com/assets/screenshot.png)
+![MarkViewer screenshot](https://markviewer.com/assets/screenshot-v2.png)
 
 ## Why MarkViewer
 
-AI writes drafts. Humans review them. MarkViewer is built for **review** — open a `.md` file, annotate any passage, and hand it off to your AI assistant.
+Double-click a `.md` file and it opens rendered — no workspace, no project, no configuration. That is the whole core of the app, and it is useful on its own.
+
+If you also work with AI tools, two optional layers sit on top:
+
+**Ask Agent** — describe a change and let an agent make it. MarkViewer detects the Claude Code or Codex CLI you already have installed and runs the task there. The agent works on an isolated copy of the folder; your file changes only after you review the diff and click Apply. No API key, no account setup.
+
+**Review Loop** — for docs an agent already wrote:
 
 - `⌘⇧R` — leave an inline review comment on selected text
-- `⌘⇧↵` — open an editable prompt panel pre-filled with your annotations
+- Resolve comments with an agent in place, or `⌘⇧↵` to open an editable prompt panel pre-filled with your annotations
 - Paste into Claude, ChatGPT, Cursor, Gemini, Copilot — anywhere that takes text
 - Annotations persist as HTML comments inside the markdown — no lock-in
 
@@ -25,10 +33,9 @@ AI writes drafts. Humans review them. MarkViewer is built for **review** — ope
 2. Drag to `Applications` and launch
 3. Double-click any `.md` file — or set MarkViewer as your default app for `.md`
 
-Or install with [Homebrew](https://github.com/SeungbinBaik/homebrew-tap):
+Or install with [Homebrew](https://formulae.brew.sh/cask/markviewer) — MarkViewer is in the official cask repository, so no tap is needed:
 
 ```sh
-brew tap SeungbinBaik/tap
 brew install --cask markviewer
 ```
 
@@ -36,10 +43,11 @@ brew install --cask markviewer
 
 - **Real-time WYSIWYG markdown** — type and render in one view, no preview pane to toggle
 - **GitHub Flavored Markdown** — tables, task lists, code highlighting, Mermaid diagrams
-- **AI Review Loop** — annotate + hand off to any AI assistant; clipboard only on explicit click
+- **Ask Agent** — run your local Claude Code or Codex CLI on a document; review the diff before it lands
+- **AI Review Loop** — annotate + resolve with an agent, or hand off to any AI assistant
 - **Auto Table of Contents** — navigate long documents from the left rail
 - **Multi-tab & multi-window** — review several files side by side
-- **100% offline** — your files never leave your Mac, no API key required
+- **100% offline** — MarkViewer holds no API key and uploads nothing; agents run locally under your own CLI login
 
 ## Compared to alternatives
 
