@@ -1,0 +1,68 @@
+name: Probe Finder automation
+
+# Diagnostic only. Runs on the Mac mini through the *service* runner chain
+# (runsvc.sh -> node -> bash), which is the context a real release build uses.
+# A one-off launchd probe is not equivalent: TCC binds automation consent to
+# the responsible process, and the service chain has a different identity.
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: [self-hosted, macOS, ARM64, mini-probe]
+    steps:
+      - name: Who am I
+        run: |
+          echo "host=$(hostname -s)  user=$(whoami)"
+          echo "launchd session type: $(launchctl managername 2>/dev/null || echo unknown)"
+          echo "parent chain:"
+          ps -o pid,ppid,command -p $$ | tail -1
+          echo "disk free:"; df -h / | tail -1
+
+      - name: Finder AppleScript probe
+        id: finder
+        continue-on-error: true
+        run: |
+          set +e
+          out=$(osascript -e 'tell application "Finder" to get name of startup disk' 2>&1)
+          code=$?
+          echo "exit=$code output=$out"
+          if [ $code -ne 0 ]; then
+            echo "FINDER_OK=false" >> $GITHUB_OUTPUT
+          else
+            echo "FINDER_OK=true" >> $GITHUB_OUTPUT
+          fi
+          exit 0
+
+      - name: Full create-dmg dry run
+        continue-on-error: true
+        run: |
+          set +e
+          work=$(mktemp -d)
+          mkdir -p "$work/src"
+          # A tiny fake .app is enough: create-dmg's Finder step does not care
+          # what the payload is, only that it lays out a window.
+          mkdir -p "$work/src/Probe.app/Contents/MacOS"
+          printf '#!/bin/sh\nexit 0\n' > "$work/src/Probe.app/Contents/MacOS/Probe"
+          chmod +x "$work/src/Probe.app/Contents/MacOS/Probe"
+          cd "$work"
+          time create-dmg \
+            --volname "Probe" \
+            --window-pos 200 120 \
+            --window-size 660 400 \
+            --icon-size 100 \
+            --icon "Probe.app" 180 170 \
+            --hide-extension "Probe.app" \
+            --app-drop-link 480 170 \
+            --no-internet-enable \
+            Probe.dmg src/
+          echo "create-dmg exit=$?"
+          ls -la Probe.dmg 2>/dev/null || echo "no dmg produced"
+          echo "--- attached images after run ---"
+          hdiutil info | grep -E "image-path" || echo "(none attached)"
+          rm -rf "$work"
+          exit 0
+
+      - name: Verdict
+        run: |
+          echo "Finder reachable from service chain: ${{ steps.finder.outputs.FINDER_OK }}"
