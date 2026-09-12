@@ -64,6 +64,36 @@ jobs:
           tar -xzf source.tar.gz --strip-components=1
           rm source.tar.gz
 
+      # A release builds ARM64, x86_64 and a universal binary, so it needs
+      # room. When the disk runs out mid-build the failure surfaces somewhere
+      # unrelated — a cargo registry crate whose extracted directory is simply
+      # missing, reported as "failed to read plugin permissions: ...toml: No
+      # such file or directory" — which costs a 12-minute build and a long
+      # detour to diagnose. Say it up front instead.
+      #
+      # Numbers are measured on this runner: a release failed at 9.5Gi free
+      # and succeeded at 16Gi.
+      - name: Check disk space
+        run: |
+          avail=$(df -g / | awk 'NR==2 {print $4}')
+          # Fail loudly rather than open: an unreadable number would make
+          # every comparison below error out while the step still exits 0,
+          # which is a guard that quietly grants permission.
+          case "$avail" in
+            ''|*[!0-9]*)
+              echo "::error::could not read free disk space from df (got '$avail')"
+              exit 1
+              ;;
+          esac
+          echo "available: ${avail}Gi"
+          if [ "$avail" -lt 8 ]; then
+            echo "::error::Only ${avail}Gi free; a release build needs roughly 15Gi. Free space and re-run."
+            exit 1
+          fi
+          if [ "$avail" -lt 15 ]; then
+            echo "::warning::Only ${avail}Gi free; a release build needs roughly 15Gi and may fail."
+          fi
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
