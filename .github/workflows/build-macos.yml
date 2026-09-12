@@ -69,6 +69,49 @@ jobs:
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
+      # The app links a Swift package (the IME bridge) through swift-rs, which
+      # shells out to `swift build` and offers no way to pass it a flag. As of
+      # Command Line Tools 27.0 SwiftPM defaults to the XCBuild engine, which
+      # cannot initialize without an Xcode.app present:
+      #
+      #   error: Could not initialize build system
+      #          "Unknown error parsing property list"
+      #
+      # The legacy engine still works, so put a `swift` shim ahead of the real
+      # one on PATH. Installed ONLY when the default engine is actually broken,
+      # so it disappears by itself once the runner gains an Xcode.app or Apple
+      # ships a fix — which matters, because `--build-system native` is
+      # deprecated and slated for removal.
+      - name: Work around SwiftPM build system (CLT-only runners)
+        run: |
+          probe="$(mktemp -d)/probe"
+          mkdir -p "$probe/Sources/probe"
+          cat > "$probe/Package.swift" <<'SWIFT'
+          // swift-tools-version:5.9
+          import PackageDescription
+          let package = Package(name: "probe", targets: [.target(name: "probe")])
+          SWIFT
+          echo 'public let probe = 0' > "$probe/Sources/probe/probe.swift"
+
+          if swift build --package-path "$probe" >/dev/null 2>&1; then
+            echo "SwiftPM default build system works; no shim needed."
+            rm -rf "$(dirname "$probe")"
+            exit 0
+          fi
+
+          echo "::warning::SwiftPM default build system is broken on this runner; using --build-system native"
+          shim="$RUNNER_TEMP/swift-shim"
+          mkdir -p "$shim"
+          real="$(command -v swift)"
+          cat > "$shim/swift" <<SHIM
+          #!/bin/sh
+          if [ "\$1" = "build" ]; then shift; exec "$real" build --build-system native "\$@"; fi
+          exec "$real" "\$@"
+          SHIM
+          chmod +x "$shim/swift"
+          echo "$shim" >> "$GITHUB_PATH"
+          rm -rf "$(dirname "$probe")"
+
       - name: Install dependencies
         run: |
           # Use local npm cache for faster installs
