@@ -1,0 +1,85 @@
+name: Probe SwiftPM shim
+
+# Diagnostic only. Runs the real 'Check disk space' and 'Work around SwiftPM'
+# step bodies on the release runner, in its launchd service context, and then
+# proves a Swift package actually builds in a LATER step -- which is the part
+# that matters, because $GITHUB_PATH only affects subsequent steps.
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: [self-hosted, macOS, ARM64, dmg-capable]
+    steps:
+      - name: Context
+        run: |
+          echo "host=$(hostname -s) user=$(whoami)"
+          echo "clt=$(pkgutil --pkg-info=com.apple.pkg.CLTools_Executables 2>/dev/null | awk '/version:/{print $2}')"
+          echo "sdk=$(xcrun --show-sdk-version 2>&1)"
+          echo "swift=$(command -v swift)"
+
+      - name: Check disk space
+        run: |
+          avail=$(df -g / | awk 'NR==2 {print $4}')
+          # Fail loudly rather than open: an unreadable number would make
+          # every comparison below error out while the step still exits 0,
+          # which is a guard that quietly grants permission.
+          case "$avail" in
+            ''|*[!0-9]*)
+              echo "::error::could not read free disk space from df (got '$avail')"
+              exit 1
+              ;;
+          esac
+          echo "available: ${avail}Gi"
+          if [ "$avail" -lt 8 ]; then
+            echo "::error::Only ${avail}Gi free; a release build needs roughly 15Gi. Free space and re-run."
+            exit 1
+          fi
+          if [ "$avail" -lt 15 ]; then
+            echo "::warning::Only ${avail}Gi free; a release build needs roughly 15Gi and may fail."
+          fi
+
+      - name: Work around SwiftPM build system (CLT-only runners)
+        run: |
+          probe="$(mktemp -d)/probe"
+          mkdir -p "$probe/Sources/probe"
+          cat > "$probe/Package.swift" <<'SWIFT'
+          // swift-tools-version:5.9
+          import PackageDescription
+          let package = Package(name: "probe", targets: [.target(name: "probe")])
+          SWIFT
+          echo 'public let probe = 0' > "$probe/Sources/probe/probe.swift"
+
+          if swift build --package-path "$probe" >/dev/null 2>&1; then
+            echo "SwiftPM default build system works; no shim needed."
+            rm -rf "$(dirname "$probe")"
+            exit 0
+          fi
+
+          echo "::warning::SwiftPM default build system is broken on this runner; using --build-system native"
+          shim="$RUNNER_TEMP/swift-shim"
+          mkdir -p "$shim"
+          real="$(command -v swift)"
+          cat > "$shim/swift" <<SHIM
+          #!/bin/sh
+          if [ "\$1" = "build" ]; then shift; exec "$real" build --build-system native "\$@"; fi
+          exec "$real" "\$@"
+          SHIM
+          chmod +x "$shim/swift"
+          echo "$shim" >> "$GITHUB_PATH"
+          rm -rf "$(dirname "$probe")"
+
+      - name: Swift package builds (later step, so GITHUB_PATH applies)
+        run: |
+          echo "swift resolves to: $(command -v swift)"
+          pkg="$(mktemp -d)/probe"
+          mkdir -p "$pkg/Sources/probe"
+          cat > "$pkg/Package.swift" <<'SWIFT'
+          // swift-tools-version:5.9
+          import PackageDescription
+          let package = Package(name: "probe", targets: [.target(name: "probe")])
+          SWIFT
+          echo 'public let probe = 0' > "$pkg/Sources/probe/probe.swift"
+          swift build --package-path "$pkg"
+          echo "RESULT: swift build succeeded"
+          rm -rf "$(dirname "$pkg")"
