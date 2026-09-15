@@ -94,6 +94,30 @@ jobs:
             echo "::warning::Only ${avail}Gi free; a release build needs roughly 15Gi and may fail."
           fi
 
+      # A cargo registry of our own, not the default ~/.cargo that every other
+      # build on this machine shares.
+      #
+      # The immarkviewer CI runs on the same Mac mini and uses
+      # Swatinem/rust-cache, whose save step PRUNES ~/.cargo/registry/src
+      # before writing the cache. It saves only on pushes to main -- which is
+      # exactly when a release is cut, because cutting one starts by merging a
+      # PR.
+      #
+      # v1.8.10-beta.2 hit it: immarkviewer CI ran 12:02:33-12:08:28, this
+      # build 12:02:40-12:08:13. ARM64 finished at 12:07:07 and passed; x86_64
+      # started and died 54s later with `could not execute process rustc ...
+      # (never executed) / No such file or directory`, compiling rustls out of
+      # the registry the other job was pruning underneath it. Eight ENOENTs and
+      # zero ENOSPC: this is NOT the disk-exhaustion failure the Check disk
+      # space step guards against, it only looks like it.
+      #
+      # Only the data directory moves. cargo is Homebrew's (/opt/homebrew/bin)
+      # and the cross-compile targets live in RUSTUP_HOME, both unaffected --
+      # verified before changing this. Costs one cold registry fetch (~500MB)
+      # and the disk to keep it.
+      - name: Use a private cargo registry
+        run: echo "CARGO_HOME=$HOME/.cargo-markviewer-releases" >> "$GITHUB_ENV"
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
