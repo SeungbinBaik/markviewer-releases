@@ -10,15 +10,16 @@ name: Runner Housekeeping
 # own work tree, which every build wipes at its first step anyway. Nothing
 # outside those paths is read or removed.
 #
-# Deliberately no `du` or `find` across $HOME: the first version of this
-# workflow spent twenty minutes walking the disk and still had not reported.
-# Sizes are measured only for the handful of paths this can act on.
+# Measuring is capped, not thorough. Two earlier versions of this workflow sat
+# on `du` for twenty minutes without printing a line — on a disk this full,
+# walking it costs more than the number is worth. `df` is the number that
+# decides whether a build can run, and it is instant.
 
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'report = sizes only, clean = delete them'
+        description: 'report = free space only, clean = delete regenerable caches'
         required: true
         default: 'report'
         type: choice
@@ -32,19 +33,8 @@ jobs:
     runs-on: [self-hosted, macOS, ARM64, dmg-capable]
 
     steps:
-      - name: Sizes
-        run: |
-          df -h /
-          echo
-          for d in \
-            "$HOME/Library/Developer/Xcode/DerivedData" \
-            "$HOME/.cargo/registry/src" \
-            "$HOME/.cargo/registry/cache" \
-            "$HOME/markviewer-runner/_work" \
-            "$HOME/Library/Caches"
-          do
-            if [ -e "$d" ]; then du -sh "$d" 2>/dev/null; else echo "-       $d (absent)"; fi
-          done
+      - name: Free space
+        run: df -h /
 
       - name: Clean
         if: ${{ github.event.inputs.mode == 'clean' }}
@@ -52,10 +42,18 @@ jobs:
           before=$(df -g / | awk 'NR==2 {print $4}')
           echo "before: ${before}Gi free"
 
-          rm -rf "$HOME/Library/Developer/Xcode/DerivedData"/* 2>/dev/null || true
-          rm -rf "$HOME/.cargo/registry/src" "$HOME/.cargo/registry/cache" 2>/dev/null || true
-          # The work tree is rebuilt from scratch by the build's own first step.
-          rm -rf "$HOME/markviewer-runner/_work"/* 2>/dev/null || true
+          for d in \
+            "$HOME/Library/Developer/Xcode/DerivedData" \
+            "$HOME/.cargo/registry/src" \
+            "$HOME/.cargo/registry/cache" \
+            "$HOME/markviewer-runner/_work"
+          do
+            [ -e "$d" ] || { echo "skip (absent): $d"; continue; }
+            echo "removing: $d"
+            rm -rf "$d" 2>/dev/null || true
+            mkdir -p "$d" 2>/dev/null || true
+            echo "  now: $(df -g / | awk 'NR==2 {print $4}')Gi free"
+          done
 
           after=$(df -g / | awk 'NR==2 {print $4}')
           echo "after: ${after}Gi free"
