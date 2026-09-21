@@ -5,26 +5,24 @@ name: Runner Housekeeping
 # that machine from the release tooling, but the runner is already a shell on
 # it — so housekeeping runs the same way a build does.
 #
-# Every path below is one a later build rebuilds on its own: Xcode build
-# products, the cargo registry's downloaded crate sources, and the runner's
-# own work tree, which every build wipes at its first step anyway. Nothing
-# outside those paths is read or removed.
+# `locate` finds where the disk actually went. The guesses in the first
+# version were wrong: this runner has no Xcode DerivedData and its work tree
+# is not under $HOME/markviewer-runner, so clearing those freed nothing.
 #
-# Measuring is capped, not thorough. Two earlier versions of this workflow sat
-# on `du` for twenty minutes without printing a line — on a disk this full,
-# walking it costs more than the number is worth. `df` is the number that
-# decides whether a build can run, and it is instant.
+# Every measurement is capped. Two earlier versions sat on an uncapped `du`
+# for twenty minutes without printing a line; on a disk this full, walking it
+# costs more than the number is worth.
 
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'report = free space only, clean = delete regenerable caches'
+        description: 'locate = find what is large, clean = delete the build caches'
         required: true
-        default: 'report'
+        default: 'locate'
         type: choice
         options:
-          - report
+          - locate
           - clean
 
 jobs:
@@ -33,8 +31,27 @@ jobs:
     runs-on: [self-hosted, macOS, ARM64, dmg-capable]
 
     steps:
-      - name: Free space
-        run: df -h /
+      - name: Where this runner lives
+        run: |
+          echo "HOME=$HOME"
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          echo "RUNNER_WORKSPACE=$RUNNER_WORKSPACE"
+          echo "RUNNER_TEMP=$RUNNER_TEMP"
+          echo "RUNNER_TOOL_CACHE=$RUNNER_TOOL_CACHE"
+          echo "--- free space, both volumes ---"
+          df -h / /System/Volumes/Data
+
+      - name: What is large
+        if: ${{ github.event.inputs.mode == 'locate' }}
+        run: |
+          # -x stays on one filesystem, -d1 stops at the first level, and the
+          # timeout means a slow branch costs a minute rather than the job.
+          echo "=== \$HOME, one level ==="
+          timeout 120 du -x -d 1 -h "$HOME" 2>/dev/null | sort -rh | head -20 || echo "(timed out)"
+          echo "=== runner work tree ==="
+          timeout 90 du -x -d 2 -h "$(dirname "$RUNNER_WORKSPACE")" 2>/dev/null | sort -rh | head -12 || echo "(timed out)"
+          echo "=== /Users, one level ==="
+          timeout 60 du -x -d 1 -h /Users 2>/dev/null | sort -rh | head -10 || echo "(timed out)"
 
       - name: Clean
         if: ${{ github.event.inputs.mode == 'clean' }}
@@ -42,21 +59,19 @@ jobs:
           before=$(df -g / | awk 'NR==2 {print $4}')
           echo "before: ${before}Gi free"
 
-          for d in \
-            "$HOME/Library/Developer/Xcode/DerivedData" \
-            "$HOME/.cargo/registry/src" \
-            "$HOME/.cargo/registry/cache" \
-            "$HOME/markviewer-runner/_work"
-          do
-            [ -e "$d" ] || { echo "skip (absent): $d"; continue; }
-            echo "removing: $d"
-            rm -rf "$d" 2>/dev/null || true
-            mkdir -p "$d" 2>/dev/null || true
-            echo "  now: $(df -g / | awk 'NR==2 {print $4}')Gi free"
-          done
+          # The work tree the runner actually uses. Every build wipes its own
+          # workspace at the first step, so nothing here outlives a run.
+          if [ -n "$RUNNER_WORKSPACE" ]; then
+            root=$(dirname "$RUNNER_WORKSPACE")
+            echo "clearing work tree: $root"
+            rm -rf "$root"/*/*/target 2>/dev/null || true
+            rm -rf "$RUNNER_TEMP"/* 2>/dev/null || true
+          fi
+          rm -rf "$HOME/.cargo/registry/src" "$HOME/.cargo/registry/cache" 2>/dev/null || true
+          rm -rf "$HOME/Library/Caches/Homebrew" 2>/dev/null || true
 
           after=$(df -g / | awk 'NR==2 {print $4}')
           echo "after: ${after}Gi free"
           if [ "$after" -lt 15 ]; then
-            echo "::warning::Still ${after}Gi free; a release build wants ~15Gi. Something outside these paths is holding the disk."
+            echo "::warning::Still ${after}Gi free; a release build wants ~15Gi. Run mode=locate and look at what is left."
           fi
