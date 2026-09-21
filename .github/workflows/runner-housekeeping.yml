@@ -5,16 +5,20 @@ name: Runner Housekeeping
 # that machine from the release tooling, but the runner is already a shell on
 # it — so housekeeping runs the same way a build does.
 #
-# `report` only looks. `clean` removes caches that a later build regenerates
-# on its own: Xcode DerivedData, the cargo registry's downloaded sources, and
-# the runner's own work tree (which every build wipes at its first step
-# anyway). Nothing outside those paths is touched.
+# Every path below is one a later build rebuilds on its own: Xcode build
+# products, the cargo registry's downloaded crate sources, and the runner's
+# own work tree, which every build wipes at its first step anyway. Nothing
+# outside those paths is read or removed.
+#
+# Deliberately no `du` or `find` across $HOME: the first version of this
+# workflow spent twenty minutes walking the disk and still had not reported.
+# Sizes are measured only for the handful of paths this can act on.
 
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'report = look only, clean = delete regenerable caches'
+        description: 'report = sizes only, clean = delete them'
         required: true
         default: 'report'
         type: choice
@@ -28,54 +32,33 @@ jobs:
     runs-on: [self-hosted, macOS, ARM64, dmg-capable]
 
     steps:
-      - name: Disk report
+      - name: Sizes
         run: |
-          echo "=== free space ==="
           df -h /
           echo
-          echo "=== largest under \$HOME ==="
-          du -sh "$HOME"/* 2>/dev/null | sort -rh | head -15
-          echo
-          echo "=== regenerable caches ==="
           for d in \
             "$HOME/Library/Developer/Xcode/DerivedData" \
-            "$HOME/.cargo/registry" \
-            "$HOME/Library/Caches" \
+            "$HOME/.cargo/registry/src" \
+            "$HOME/.cargo/registry/cache" \
             "$HOME/markviewer-runner/_work" \
-            "$HOME/actions-runner/_work"
+            "$HOME/Library/Caches"
           do
-            [ -e "$d" ] && du -sh "$d" 2>/dev/null
+            if [ -e "$d" ]; then du -sh "$d" 2>/dev/null; else echo "-       $d (absent)"; fi
           done
-          echo
-          echo "=== cargo build dirs over 1G ==="
-          find "$HOME" -maxdepth 6 -type d -name target -prune 2>/dev/null | while read -r t; do
-            [ -f "$t/CACHEDIR.TAG" ] || continue
-            s=$(du -sm "$t" 2>/dev/null | cut -f1)
-            [ "${s:-0}" -gt 1000 ] && echo "${s}M  $t"
-          done | sort -rn | head -10
-          echo "(report done)"
 
-      - name: Clean regenerable caches
+      - name: Clean
         if: ${{ github.event.inputs.mode == 'clean' }}
         run: |
           before=$(df -g / | awk 'NR==2 {print $4}')
           echo "before: ${before}Gi free"
 
-          # Xcode build products. Rebuilt on demand.
           rm -rf "$HOME/Library/Developer/Xcode/DerivedData"/* 2>/dev/null || true
-
-          # Downloaded crate sources and their archives. Re-fetched on demand.
           rm -rf "$HOME/.cargo/registry/src" "$HOME/.cargo/registry/cache" 2>/dev/null || true
-
-          # The runner's work tree. Every build wipes this at its first step,
-          # so nothing here outlives a run by design.
-          rm -rf "$HOME/markviewer-runner/_work"/_temp/* 2>/dev/null || true
-          find "$HOME/markviewer-runner/_work" -maxdepth 6 -type d -name target -prune 2>/dev/null | while read -r t; do
-            [ -f "$t/CACHEDIR.TAG" ] && rm -rf "$t"
-          done
+          # The work tree is rebuilt from scratch by the build's own first step.
+          rm -rf "$HOME/markviewer-runner/_work"/* 2>/dev/null || true
 
           after=$(df -g / | awk 'NR==2 {print $4}')
           echo "after: ${after}Gi free"
           if [ "$after" -lt 15 ]; then
-            echo "::warning::Still only ${after}Gi free; a release build wants ~15Gi. See the report above for what else is large."
+            echo "::warning::Still ${after}Gi free; a release build wants ~15Gi. Something outside these paths is holding the disk."
           fi
