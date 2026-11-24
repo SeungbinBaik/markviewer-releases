@@ -64,6 +64,25 @@ jobs:
           tar -xzf source.tar.gz --strip-components=1
           rm source.tar.gz
 
+      # The macOS floor this release is built with, for the v2 manifest's
+      # min_macos (see Generate v2 manifest). Read and checked here, before
+      # anything is built or published: the v2 manifest is written after
+      # "Upload to releases" has already made the release public, and a
+      # failure there would leave the newest release without latest.json,
+      # which stalls updates for every client.
+      - name: Read macOS floor (min_macos)
+        id: floor
+        run: |
+          MIN=$(jq -r '.bundle.macOS.minimumSystemVersion // empty' src-tauri/tauri.conf.json)
+          # Same shape the app accepts (valid_min_macos): one to three numeric
+          # parts of up to three digits, major 10 or later.
+          if ! printf '%s' "$MIN" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){0,2}$' || [ "${MIN%%.*}" -lt 10 ]; then
+            echo "::error::bundle.macOS.minimumSystemVersion is '$MIN', not a macOS floor the app's update gate accepts"
+            exit 1
+          fi
+          echo "min_macos: $MIN"
+          echo "MIN_MACOS=$MIN" >> "$GITHUB_OUTPUT"
+
       # A release builds ARM64, x86_64 and a universal binary, so it needs
       # room. When the disk runs out mid-build the failure surfaces somewhere
       # unrelated — a cargo registry crate whose extracted directory is simply
@@ -399,17 +418,14 @@ jobs:
       # A v2 manifest without a valid min_macos is worse than none: the app
       # refuses the release it names and will not take that same version from
       # the legacy feed either, so every 1.8.12+ install would stop updating.
-      # Hence the hard failure here, before anything is published.
+      # The value was checked by "Read macOS floor" before the build started.
       - name: Generate v2 manifest (min_macos)
         run: |
-          MIN=$(jq -r '.bundle.macOS.minimumSystemVersion // empty' src-tauri/tauri.conf.json)
-          # Same shape the app accepts (valid_min_macos): one to three numeric
-          # parts of up to three digits, major 10 or later.
-          if ! printf '%s' "$MIN" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){0,2}$' || [ "${MIN%%.*}" -lt 10 ]; then
-            echo "::error::bundle.macOS.minimumSystemVersion is '$MIN', not a macOS floor the app's update gate accepts"
+          MIN="${{ steps.floor.outputs.MIN_MACOS }}"
+          if [ -z "$MIN" ]; then
+            echo "::error::no min_macos from the Read macOS floor step"
             exit 1
           fi
-          echo "min_macos: $MIN"
 
           jq --arg min "$MIN" '. + {min_macos: $min}' generated-manifest.json > generated-manifest-v2.json
 
