@@ -4,10 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: 'Either a commit SHA on main whose manifests/latest-beta.json to restore, OR the literal "stable" to make latest-beta byte-for-byte equal to the current latest.json'
+        description: 'Either a commit SHA on main whose manifests/latest-beta.json (and latest-beta-v2.json) to restore, OR the literal "stable" to make them byte-for-byte equal to the current latest.json (and latest-v2.json)'
         required: true
         type: string
 
+# Two beta feeds move together. MarkViewer 1.8.12+ reads latest-beta-v2.json
+# first and only falls back to latest-beta.json when v2 is missing or broken,
+# so rolling back latest-beta.json alone would leave those installs on the
+# release being rolled back. Where the target has no v2 manifest (a SHA from
+# before v2 existed, or a stable release built before it), the beta v2 file
+# is removed: the app then falls back to the restored latest-beta.json.
 jobs:
   rollback:
     runs-on: ubuntu-latest
@@ -18,7 +24,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PAT }}
 
-      - name: Restore manifests/latest-beta.json
+      - name: Restore manifests/latest-beta.json and latest-beta-v2.json
         run: |
           TARGET="${{ inputs.target }}"
           mkdir -p manifests
@@ -29,13 +35,29 @@ jobs:
             curl -fsSL -o /tmp/stable-latest.json \
               https://github.com/SeungbinBaik/markviewer-releases/releases/latest/download/latest.json
             cp /tmp/stable-latest.json manifests/latest-beta.json
+
+            # Only a 404 means "this stable has no v2 manifest"; any other
+            # failure must not be mistaken for it and delete the beta v2 file.
+            code=$(curl -sSL -o /tmp/stable-latest-v2.json -w '%{http_code}' \
+              https://github.com/SeungbinBaik/markviewer-releases/releases/latest/download/latest-v2.json)
+            case "$code" in
+              200) cp /tmp/stable-latest-v2.json manifests/latest-beta-v2.json ;;
+              404) rm -f manifests/latest-beta-v2.json ;;
+              *)   echo "::error::fetching stable latest-v2.json returned HTTP $code"; exit 1 ;;
+            esac
           else
             # Restore content from the given commit SHA on main.
             git show "$TARGET:manifests/latest-beta.json" > /tmp/target-manifest.json
             cp /tmp/target-manifest.json manifests/latest-beta.json
+
+            if git cat-file -e "$TARGET:manifests/latest-beta-v2.json" 2>/dev/null; then
+              git show "$TARGET:manifests/latest-beta-v2.json" > manifests/latest-beta-v2.json
+            else
+              rm -f manifests/latest-beta-v2.json
+            fi
           fi
 
-      - name: Verify restored manifest is valid JSON with platforms
+      - name: Verify restored manifests
         run: |
           jq -e '.version and .platforms["darwin-aarch64"].url and .platforms["darwin-x86_64"].url' \
             manifests/latest-beta.json > /dev/null || {
@@ -43,14 +65,33 @@ jobs:
             exit 1;
           }
 
+          if [ -f manifests/latest-beta-v2.json ]; then
+            jq -e '.version and .platforms["darwin-aarch64"].url and .platforms["darwin-x86_64"].url' \
+              manifests/latest-beta-v2.json > /dev/null || {
+              echo "::error::restored manifests/latest-beta-v2.json is not a valid updater manifest";
+              exit 1;
+            }
+            # Without a valid min_macos the app refuses the release v2 names
+            # and every 1.8.12+ beta install stops updating.
+            MIN=$(jq -r '.min_macos // empty' manifests/latest-beta-v2.json)
+            if ! printf '%s' "$MIN" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){0,2}$' || [ "${MIN%%.*}" -lt 10 ]; then
+              echo "::error::restored manifests/latest-beta-v2.json has no valid min_macos (got '$MIN')"
+              exit 1
+            fi
+            echo "latest-beta-v2.json: $(jq -r .version manifests/latest-beta-v2.json), min_macos $MIN"
+          else
+            echo "latest-beta-v2.json: removed (target has none); 1.8.12+ beta installs fall back to latest-beta.json"
+          fi
+          echo "latest-beta.json: $(jq -r .version manifests/latest-beta.json)"
+
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add manifests/latest-beta.json
+          git add -A manifests/
           if git diff --cached --quiet; then
-            echo "manifests/latest-beta.json already at requested target; no commit"
+            echo "beta manifests already at requested target; no commit"
             exit 0
           fi
-          git commit -m "chore(manifest): rollback latest-beta.json (target=${{ inputs.target }})"
+          git commit -m "chore(manifest): rollback beta manifests (target=${{ inputs.target }})"
           git push origin main

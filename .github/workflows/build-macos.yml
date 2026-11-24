@@ -387,16 +387,51 @@ jobs:
           }
           EOF
 
-      - name: Upload latest.json (stable only)
+      # The v2 feed: the same manifest plus `min_macos`, the macOS floor this
+      # release was built with. MarkViewer 1.8.12+ reads v2 first and will not
+      # install a release whose floor is above the Mac it runs on (the app's
+      # update gate, update_runs_on in src-tauri/src/lib.rs). Every older
+      # version reads only latest.json / latest-beta.json, so those must never
+      # point at a release that raised the floor -- that needs a legacy pin,
+      # which is not built yet. Until a floor is raised, v2 and legacy name
+      # the same release and the gate passes every Mac without reading the OS.
+      #
+      # A v2 manifest without a valid min_macos is worse than none: the app
+      # refuses the release it names and will not take that same version from
+      # the legacy feed either, so every 1.8.12+ install would stop updating.
+      # Hence the hard failure here, before anything is published.
+      - name: Generate v2 manifest (min_macos)
+        run: |
+          MIN=$(jq -r '.bundle.macOS.minimumSystemVersion // empty' src-tauri/tauri.conf.json)
+          # Same shape the app accepts (valid_min_macos): one to three numeric
+          # parts of up to three digits, major 10 or later.
+          if ! printf '%s' "$MIN" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){0,2}$' || [ "${MIN%%.*}" -lt 10 ]; then
+            echo "::error::bundle.macOS.minimumSystemVersion is '$MIN', not a macOS floor the app's update gate accepts"
+            exit 1
+          fi
+          echo "min_macos: $MIN"
+
+          jq --arg min "$MIN" '. + {min_macos: $min}' generated-manifest.json > generated-manifest-v2.json
+
+          # v2 is legacy plus min_macos and nothing else.
+          jq -e --slurpfile legacy generated-manifest.json --arg min "$MIN" \
+            '.min_macos == $min and del(.min_macos) == $legacy[0]' \
+            generated-manifest-v2.json > /dev/null || {
+            echo "::error::generated-manifest-v2.json is not generated-manifest.json plus min_macos";
+            exit 1;
+          }
+
+      - name: Upload latest.json and latest-v2.json (stable only)
         if: steps.version.outputs.CHANNEL == 'stable'
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
           cp generated-manifest.json latest.json
+          cp generated-manifest-v2.json latest-v2.json
           gh release upload v${{ steps.version.outputs.VERSION }} \
             --repo SeungbinBaik/markviewer-releases \
             --clobber \
-            latest.json
+            latest.json latest-v2.json
 
       - name: Checkout markviewer-releases for manifest sync
         uses: actions/checkout@v5
@@ -406,21 +441,26 @@ jobs:
           path: releases-repo
           token: ${{ secrets.RELEASE_PAT }}
 
-      - name: Sync manifests/latest-beta.json
+      - name: Sync manifests/latest-beta.json and latest-beta-v2.json
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
           cd releases-repo
           mkdir -p manifests
           cp ../generated-manifest.json manifests/latest-beta.json
+          cp ../generated-manifest-v2.json manifests/latest-beta-v2.json
 
-          # Stable sync integrity: the just-written manifests/latest-beta.json
-          # must be byte-for-byte equal to the latest.json release asset so
-          # beta users naturally rejoin stable on the next check. Abort on
-          # mismatch rather than risk publishing inconsistent state.
+          # Stable sync integrity: the just-written beta manifests must be
+          # byte-for-byte equal to the latest.json / latest-v2.json release
+          # assets so beta users naturally rejoin stable on the next check.
+          # Abort on mismatch rather than risk publishing inconsistent state.
           if [ "${{ steps.version.outputs.CHANNEL }}" == "stable" ]; then
             diff -q ../latest.json manifests/latest-beta.json || {
               echo "::error::latest.json and manifests/latest-beta.json differ byte-level on stable sync";
+              exit 1;
+            }
+            diff -q ../latest-v2.json manifests/latest-beta-v2.json || {
+              echo "::error::latest-v2.json and manifests/latest-beta-v2.json differ byte-level on stable sync";
               exit 1;
             }
           fi
@@ -428,21 +468,23 @@ jobs:
           # URL sanity: the manifest's DMG url must point to this tag's
           # release assets. This guards against a beta-tag URL leaking into
           # a stable sync or vice versa.
-          jq -e --arg tag "v${{ steps.version.outputs.VERSION }}" \
-            '.platforms | to_entries[] | .value.url | contains("/releases/download/" + $tag + "/")' \
-            manifests/latest-beta.json > /dev/null || {
-            echo "::error::manifests/latest-beta.json URL does not point to v${{ steps.version.outputs.VERSION }} release assets";
-            exit 1;
-          }
+          for manifest in manifests/latest-beta.json manifests/latest-beta-v2.json; do
+            jq -e --arg tag "v${{ steps.version.outputs.VERSION }}" \
+              '.platforms | to_entries[] | .value.url | contains("/releases/download/" + $tag + "/")' \
+              "$manifest" > /dev/null || {
+              echo "::error::$manifest URL does not point to v${{ steps.version.outputs.VERSION }} release assets";
+              exit 1;
+            }
+          done
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add manifests/latest-beta.json
+          git add manifests/latest-beta.json manifests/latest-beta-v2.json
           if git diff --cached --quiet; then
-            echo "manifests/latest-beta.json unchanged, skipping commit"
+            echo "beta manifests unchanged, skipping commit"
             exit 0
           fi
-          git commit -m "chore(manifest): sync latest-beta.json for v${{ steps.version.outputs.VERSION }} (${{ steps.version.outputs.CHANNEL }})"
+          git commit -m "chore(manifest): sync latest-beta.json and latest-beta-v2.json for v${{ steps.version.outputs.VERSION }} (${{ steps.version.outputs.CHANNEL }})"
           git push origin main
 
       - name: Clean up
